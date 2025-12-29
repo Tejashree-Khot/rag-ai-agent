@@ -1,0 +1,35 @@
+[project]
+name = "rag-ai-agent-app"
+version = "0.1.0"
+description = "RAG AI agent"
+requires-python = ">=3.13"
+dependencies = [
+    "asyncpg",
+    "fastapi",
+    "langchain-community",
+    "langchain-core",
+    "langchain-groq",
+    "langchain-huggingface",
+    "langchain-milvus",
+    "langgraph",
+    "langgraph-checkpoint-postgres",
+    "milvus-lite",
+    "nest-asyncio",
+    "psycopg[binary,pool]",
+    "pydantic-settings",
+    "pymilvus",
+    "pypdf",
+    "python-dotenv",
+    "sentence-transformers",
+    "trustcall",
+    "uvicorn"
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agent", "config", "core", "memory", "service", "utils"]
+exclude = ["test"]
