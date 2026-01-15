@@ -21,6 +21,3 @@ class LLMClient:
         """
         response = await self.model.ainvoke(messages)
         return response.content
-
-
-llm_client = LLMClient()
