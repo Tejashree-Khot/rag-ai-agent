@@ -1,6 +1,5 @@
 import json
 from contextlib import asynccontextmanager
-from datetime import datetime
 
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.store.postgres import AsyncPostgresStore
@@ -69,17 +68,6 @@ async def get_postgres_store():
             await pool.close()
 
 
-async def save_message(conn, session_id: str, role: str, content: str):
-    """Save a message to the chat_history table."""
-    await conn.execute(
-        """ INSERT INTO chat_history (session_id, role, content, timestap) VALUES ($1, $2, $3, $4, $5)""",
-        session_id,
-        role,
-        content,
-        datetime.utcnow(),
-    )
-
-
 class PostgresClient:
     def __init__(self):
         self.connection_string = get_postgres_connection_string()
@@ -109,6 +97,7 @@ class PostgresClient:
                     session_id TEXT PRIMARY KEY,
                     user_input TEXT,
                     conversation_history JSONB,
+                    retrieved_context JSONB,
                     response TEXT,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
@@ -123,17 +112,20 @@ class PostgresClient:
                     session_id, 
                     user_input, 
                     conversation_history,
+                    retrieved_context,
                     response
                 )
                 VALUES (
                     %(session_id)s, 
                     %(user_input)s, 
-                    %(conversation_history)s, 
+                    %(conversation_history)s,
+                    %(retrieved_context)s,
                     %(response)s
                 )
                 ON CONFLICT (session_id) DO UPDATE SET
                     user_input = EXCLUDED.user_input,
                     conversation_history = EXCLUDED.conversation_history,
+                    retrieved_context = EXCLUDED.retrieved_context,
                     response = EXCLUDED.response,
                     updated_at = CURRENT_TIMESTAMP;
                 """,
@@ -141,6 +133,7 @@ class PostgresClient:
                     "session_id": state.session_id,
                     "user_input": state.user_input,
                     "conversation_history": json.dumps(state.conversation_history),
+                    "retrieved_context": json.dumps(state.retrieved_context),
                     "response": state.response,
                 },
             )
@@ -155,7 +148,20 @@ class PostgresClient:
                 )
                 row = await cur.fetchone()
                 if row:
-                    return SessionState(**row)
+                    parsed_row = dict(row)
+                    if "conversation_history" in parsed_row and isinstance(
+                        parsed_row["conversation_history"], str
+                    ):
+                        parsed_row["conversation_history"] = json.loads(
+                            parsed_row["conversation_history"]
+                        )
+                    if "retrieved_context" in parsed_row and isinstance(
+                        parsed_row["retrieved_context"], str
+                    ):
+                        parsed_row["retrieved_context"] = json.loads(
+                            parsed_row["retrieved_context"]
+                        )
+                    return SessionState(**parsed_row)
         return None
 
     async def close(self):
