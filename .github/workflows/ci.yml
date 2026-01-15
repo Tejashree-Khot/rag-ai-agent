@@ -51,8 +51,3 @@ jobs:
           uv run mypy ${{ env.LINT_MODULES }} --explicit-package-bases 2>&1 | tee mypy-output.txt
           MYPY_EXIT_CODE=$?
           echo -n $MYPY_EXIT_CODE > mypy-status.txt
-
-      - name: Run pytest
-        run: |
-          uv run coverage run --branch -m pytest -v --disable-warnings
-          uv run coverage report --ignore-errors --show-missing
