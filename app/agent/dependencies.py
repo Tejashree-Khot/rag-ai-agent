@@ -2,11 +2,20 @@
 
 from functools import lru_cache
 
-from agent.orchestration import Orchestrator
-from core.embedder import EmbeddingClient, create_embedding_client
+from agent.rag_agent import OrchestrateRAGAgent, ReactRAGAgent, Retriever
+from core.embedder import EmbeddingClient
 from core.llm import LLMClient
-from memory.milvus_manager import MilvusManager, create_milvus_manager
+from memory.milvus_manager import MilvusManager
 from memory.postgres import PostgresClient
+
+
+@lru_cache
+def get_embedding_client() -> EmbeddingClient:
+    """Get or create the singleton EmbeddingClient instance.
+
+    :return: The singleton EmbeddingClient instance.
+    """
+    return EmbeddingClient()
 
 
 @lru_cache
@@ -33,30 +42,33 @@ def get_milvus_manager() -> MilvusManager:
 
     :return: The singleton MilvusManager instance.
     """
-    return create_milvus_manager()
+    return MilvusManager()
 
 
 @lru_cache
-def get_embedding_client() -> EmbeddingClient:
-    """Get or create the singleton EmbeddingClient instance.
+def get_retriever() -> Retriever:
+    """Get or create the singleton Retriever instance.
 
-    :return: The singleton EmbeddingClient instance.
+    :return: The singleton Retriever instance.
     """
-    return create_embedding_client()
+    return Retriever(milvus_manager=get_milvus_manager(), embedder=get_embedding_client())
 
 
 @lru_cache
-def get_orchestrator() -> Orchestrator:
-    """Get or create the singleton Orchestrator instance.
+def get_react_rag_agent() -> ReactRAGAgent:
+    """Get or create the singleton ReactRAGAgent instance.
 
-    This ensures that the same Orchestrator instance (with its MemorySaver checkpointer)
-    is reused across requests, allowing session state to persist.
-
-    :return: The singleton Orchestrator instance.
+    :return: The singleton ReactRAGAgent instance.
     """
-    return Orchestrator(
-        llm_client=get_llm_client(),
-        postgres_client=get_postgres_client(),
-        milvus_manager=get_milvus_manager(),
-        embedding_client=get_embedding_client(),
+    return ReactRAGAgent(llm=get_llm_client(), retriever=get_retriever())
+
+
+@lru_cache
+def get_orchestrate_rag_agent() -> OrchestrateRAGAgent:
+    """Get or create the singleton OrchestrateRAGAgent instance.
+
+    :return: The singleton OrchestrateRAGAgent instance.
+    """
+    return OrchestrateRAGAgent(
+        react_rag_agent=get_react_rag_agent(), postgres_client=get_postgres_client()
     )

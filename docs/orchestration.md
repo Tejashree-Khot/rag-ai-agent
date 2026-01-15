@@ -1,72 +1,96 @@
-# LangGraph Orchestration Flow
+# RAG React Agent Orchestration Flow
 
-## Orchestration Graph
+## Architecture Overview
+
+The RAG AI Agent uses a LangChain ReAct agent pattern for intelligent retrieval-augmented generation. The architecture consists of two main components:
+
+- **OrchestrateRAGAgent**: Manages session state persistence and coordinates the agent workflow
+- **ReactRAGAgent**: Implements the ReAct (Reasoning + Acting) pattern with tool calling
+
+## Orchestration Flow
 
 ```mermaid
----
-config:
-  flowchart:
-    curve: curve
----
-%%{init: {'theme': 'neutral'}}%%
 graph TD
-    START([START]) --> input_guard
-    
-    %% Input Guard analyzes safety
-    input_guard{Input Safe?} 
-    input_guard -- Yes --> agent
-    input_guard -- No --> END([END])
-
-    %% Agent Decision Loop
-    agent{Agent Router}
-    agent -- Call RAG --> rag_tool
-    rag_tool -- Return Context --> agent
-    
-    %% Final Generation
-    agent -- Generate Answer --> response_generator
-    response_generator --> END
-
-    %% Styling
-    classDef processNode fill:#e1f5fe,stroke:#01579b,stroke-width:2px,rx:10,ry:10
-    classDef decisionNode fill:#fff3e0,stroke:#e65100,stroke-width:2px,rx:10,ry:10
-    classDef toolNode fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,rx:10,ry:10
-    classDef startEndNode fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px,rx:10,ry:10
-
-    class rag_tool toolNode
-    class agent,response_generator processNode
-    class input_guard decisionNode
-    class START,END startEndNode
-
+    A[Client] -->|POST /chat| B[FastAPI]
+    B -->|run session_id, user_input| C[OrchestrateRAGAgent]
+    C -->|load_state_memory| D[Postgres]
+    D -->|SessionState| C
+    C -->|ainvoke user_input| E[ReactRAGAgent]
+    E -->|retrieve_context question| F[RetrievalTool]
+    F -->|semantic search| G[Milvus]
+    G -->|documents| F
+    F -->|retrieved_contexts| E
+    E -->|answer + contexts| C
+    C -->|save_state_memory| D
+    C -->|result| B
+    B -->|JSON response| A
 ```
 
 ## Flow Description
 
-### Phase 1: Input Analysis
+### Phase 1: Request Handling
 
-* **START** → `input_guard`: The entry point where the user query is received.
-* `input_guard`: checks the query for safety (PII, jailbreaks, etc.) and appropriateness. If unsafe, it terminates the flow immediately.
+- **Client** sends a POST request to `/chat` with `session_id` and `user_input`
+- **FastAPI** routes the request to `OrchestrateRAGAgent.run()`
 
-### Phase 2: Agent Reasoning
+### Phase 2: State Management
 
-* **Agent Loop**: The `agent` acts as the reasoning engine (Router). It determines if it has enough information to answer:
-* If **No**: It routes to the `rag_tool`.
-* If **Yes**: It routes to the `response_generator`.
+- **OrchestrateRAGAgent** loads existing session state from PostgreSQL
+- If no state exists, a new `SessionState` is created with the provided `session_id`
 
-### Phase 3: Retrieval (RAG)
+### Phase 3: ReAct Agent Execution
 
-* `rag_tool`: Retrieves relevant documents from the vector database (e.g., Milvus) based on the query.
-* **Return**: The retrieved context is passed back to the `agent` to re-evaluate the answer.
+- **ReactRAGAgent** receives the user input and executes the ReAct loop:
+  1. The agent reasons about what action to take
+  2. Calls the `retrieve_context` tool to fetch relevant documents from Milvus
+  3. Receives retrieved contexts and chunk IDs
+  4. Generates a final answer based on the retrieved context
 
-### Phase 4: Response Generation
+### Phase 4: State Persistence
 
-* `response_generator`: Synthesizes the final answer using the chat history and retrieved context, formatting it strictly for the user.
-* **END**: Delivers the final payload to the client.
+- **OrchestrateRAGAgent** updates the session state with:
+  - Current user input
+  - Agent response
+  - Retrieved chunk IDs
+  - Conversation history (user + assistant messages)
+- State is persisted to PostgreSQL for future requests
 
-### Nodes Dictionary
+## Components
 
-| Node Name | Type | Description |
+| Component | Type | Description |
 | --- | --- | --- |
-| `input_guard` | Conditional | Validates input for safety. Redirects unsafe inputs to END. |
-| `agent` | LLM / Router | The central brain. Decides whether to call tools or generate a final answer. |
-| `rag_tool` | Tool | Performs semantic search to retrieve external context. |
-| `response_generator` | Output | Formats the final answer into the desired schema/style. |
+| `OrchestrateRAGAgent` | Orchestrator | Manages session state and coordinates agent workflow |
+| `ReactRAGAgent` | ReAct Agent | LangChain agent with tool calling capabilities |
+| `retrieve_context` | Tool | Performs semantic search on Milvus vector database |
+| `SessionState` | State Model | Pydantic model for session persistence |
+
+## Session State Schema
+
+```python
+class SessionState(BaseModel):
+    session_id: str
+    user_input: str | None
+    conversation_history: list[dict[str, Any]]
+    retrieved_context: list[dict[str, Any]]
+    response: str
+```
+
+## API Response
+
+The `/chat` endpoint returns the full `SessionState` model:
+
+```json
+{
+  "session_id": "session-123",
+  "user_input": "What is the main topic?",
+  "response": "Generated response based on retrieved context",
+  "retrieved_context": [
+    {"content": "Retrieved passage 1"},
+    {"content": "Retrieved passage 2"}
+  ],
+  "conversation_history": [
+    {"role": "user", "content": "What is the main topic?"},
+    {"role": "assistant", "content": "Generated response based on retrieved context"}
+  ]
+}
+```
