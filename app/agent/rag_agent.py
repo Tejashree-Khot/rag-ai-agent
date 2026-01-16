@@ -129,7 +129,11 @@ class ReactRAGAgent:
                 retrieved_contexts = tool_output.get("retrieved_contexts", [])
                 LOGGER.info(f"Parsed ToolMessage: {len(retrieved_contexts)} contexts")
             elif isinstance(msg, AIMessage):
-                response = str(msg.content)
+                if isinstance(msg.content, list) and len(msg.content) > 0:
+                    response = "\n".join([content.get("text", "") for content in msg.content])
+                    response = response or msg.content
+                else:
+                    response = msg.content
 
         result = {"response": response, "retrieved_contexts": retrieved_contexts}
         state = self.update_state(state, state.user_input, result)

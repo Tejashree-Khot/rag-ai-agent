@@ -1,13 +1,15 @@
 from langchain_core.messages import BaseMessage
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from config.settings import settings
 
 
 class LLMClient:
     def __init__(self):
-        self.model = ChatGroq(
-            model=settings.LLM_MODEL_NAME, api_key=settings.GROQ_API_KEY, temperature=0.2
+        self.model = ChatGoogleGenerativeAI(
+            model=settings.LLM_MODEL_NAME,
+            google_api_key=settings.GEMINI_API_KEY.get_secret_value(),
+            temperature=0.2,
         )
 
     async def ainvoke(self, messages: list[BaseMessage]):

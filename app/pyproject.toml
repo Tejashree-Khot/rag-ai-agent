@@ -10,7 +10,7 @@ dependencies = [
     "langchain-community",
     "langchain-core",
     "langchain-groq",
-    "langchain-huggingface",
+    "langchain_google_genai",
     "langchain-milvus",
     "langgraph",
     "langgraph-checkpoint-postgres",

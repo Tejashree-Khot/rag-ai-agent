@@ -9,18 +9,17 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = Field(default=200)
 
     # Embedding Settings
-    HF_TOKEN: SecretStr = SecretStr("hf_api_key")
-    EMBEDDING_MODEL_NAME: str = Field(default="all-MiniLM-L6-v2")
+    GEMINI_API_KEY: SecretStr = SecretStr("gemini_api_key")
+    EMBEDDING_MODEL_NAME: str = Field(default="gemini-embedding-001")
 
     # LLM Settings
-    GROQ_API_KEY: SecretStr = SecretStr("groq_api_key")
-    LLM_MODEL_NAME: str = Field(default="meta-llama/llama-4-maverick-17b-128e-instruct")
+    LLM_MODEL_NAME: str = Field(default="gemini-3-flash-preview")
 
     # Milvus Settings
     MILVUS_URI: str = Field(default="http://localhost:19530")
     MILVUS_TOKEN: str = Field(default="")
-    MILVUS_COLLECTION_NAME: str = Field(default="eval_rag")
-    MILVUS_EMBEDDING_DIM: int = Field(default=384)
+    MILVUS_COLLECTION_NAME: str = Field(default="rag_agent")
+    MILVUS_EMBEDDING_DIM: int = Field(default=3072)
 
     # Postgress Settings
     POSTGRES_USER: str | None = Field(default="postgres")
